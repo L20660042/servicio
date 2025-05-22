@@ -8,3 +8,4 @@ pillow
 opencv-python
 scikit-learn
 joblib
+libgl1-mesa-glx
