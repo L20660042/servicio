@@ -1,11 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
-easyocr
+pytesseract
+opencv-python-headless
+numpy
 transformers
 torch
-pillow
-opencv-python
-scikit-learn
-joblib
-libgl1-mesa-glx
+sentencepiece
