@@ -15,7 +15,8 @@ def fuse_emotions(text_emotions: dict, stroke_thickness: float, slant_angle: flo
 
     combined = {}
     for emotion in text_emotions:
-        combined[emotion] = 0.6 * text_emotions.get(emotion, 0) + 0.4 * handwriting_emotions.get(emotion, 0)
+        combined[emotion] = 0.4 * text_emotions.get(emotion, 0) + 0.6 * handwriting_emotions.get(emotion, 0)
+
 
     total_combined = sum(combined.values())
     if total_combined > 0:
