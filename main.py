@@ -11,8 +11,6 @@ from handwriting_features import calculate_stroke_thickness, calculate_slant_ang
 from text_emotion import TextEmotionAnalyzer
 from fusion import fuse_emotions, dominant_emotion
 
-from transformers import pipeline
-
 logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI(title="Servicio de Análisis de Emociones y Caligrafía")
@@ -24,21 +22,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicializar analizador de emociones de texto
 text_emotion_analyzer = TextEmotionAnalyzer()
 
-# Inicializar generador de consejos con modelo GPT-Neo
-text_generator = pipeline("text-generation", model="EleutherAI/gpt-neo-125M")
-
 def generate_emotional_advice_ai(emotions: dict, dominant: str) -> str:
-    prompt = (
-        f"Emociones detectadas: {emotions}\n"
-        f"Emoción dominante: {dominant}\n"
-        f"Genera un consejo emocional empático para ayudar a manejar estas emociones:"
-    )
     try:
-        output = text_generator(prompt, max_length=100, do_sample=True, temperature=0.7)
+        from transformers import pipeline
+        text_generator = pipeline("text-generation", model="EleutherAI/gpt-neo-125M")
+        
+        prompt = (
+            f"Emociones detectadas: {emotions}\n"
+            f"Emoción dominante: {dominant}\n"
+            f"Genera un consejo emocional empático para ayudar a manejar estas emociones:"
+        )
+        
+        output = text_generator(prompt, max_length=60, do_sample=True, temperature=0.7)
         return output[0]["generated_text"].split(":")[-1].strip()
+
     except Exception as e:
         logging.error(f"Error al generar consejo emocional: {e}")
         return "No se pudo generar un consejo emocional en este momento."
@@ -53,7 +52,7 @@ async def analyze_image(file: UploadFile = File(...)):
     try:
         image_bytes = await file.read()
 
-        # OCR para obtener texto (aunque no lo usamos para el consejo)
+        # OCR (aunque el texto no se usa para el consejo)
         start_ocr = time.time()
         text = extract_text(image_bytes)
         logging.debug(f"OCR time: {time.time() - start_ocr:.2f}s")
@@ -65,23 +64,23 @@ async def analyze_image(file: UploadFile = File(...)):
 
         _, img_bin = cv2.threshold(img_cv, 127, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        # Extraer características de escritura
+        # Extraer características caligráficas
         start_hw = time.time()
         stroke_thickness = calculate_stroke_thickness(img_bin)
         slant_angle = calculate_slant_angle(img_bin)
         spacing = calculate_spacing(img_bin)
         logging.debug(f"Handwriting features time: {time.time() - start_hw:.2f}s")
 
-        # Analizar emociones del texto
+        # Emociones a partir del texto (para fusión)
         start_text_emotion = time.time()
         text_emotions = text_emotion_analyzer.analyze(text if text else " ")
         logging.debug(f"Text emotion analysis time: {time.time() - start_text_emotion:.2f}s")
 
-        # Fusión de emociones
+        # Fusión y análisis emocional
         combined_emotions = fuse_emotions(text_emotions, stroke_thickness, slant_angle, spacing)
         dom_emotion = dominant_emotion(combined_emotions)
 
-        # Generar consejo emocional con IA
+        # Consejo emocional IA
         emotional_advice = generate_emotional_advice_ai(combined_emotions, dom_emotion)
 
         logging.debug(f"Total analyze time: {time.time() - start_total:.2f}s")
@@ -94,6 +93,7 @@ async def analyze_image(file: UploadFile = File(...)):
                 "emotional_advice": emotional_advice
             }
         }
+
     except Exception as e:
         logging.error(f"Error in analyze-image: {e}")
         return {
@@ -102,4 +102,4 @@ async def analyze_image(file: UploadFile = File(...)):
         }
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, timeout_keep_alive=120)
