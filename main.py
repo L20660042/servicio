@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from transformers import pipeline
 from PIL import Image
@@ -28,21 +28,21 @@ def analyze_text_emotion(text):
         dominant_emotion = result['labels'][0]
         emotions = {emotion: result['scores'][i] for i, emotion in enumerate(result['labels'])}
 
-        # Generar un consejo basado en la emoción dominante
+        # Generar un consejo basado en la emoción dominante y el tipo de texto
         if dominant_emotion == "enojo":
-            advice = "Parece que estás enojado. Tal vez tomar un descanso y relajarte te ayude."
+            advice = "Mediante los trazos y el grosor del texto, se detecta que estás enojado. Deberías salir a distraerte y calmarte."
         elif dominant_emotion == "tristeza":
-            advice = "Parece que estás triste. Hablar con alguien podría ayudarte a sentirte mejor."
+            advice = "El texto refleja tristeza, probablemente debido a un mal momento. Hablar con alguien podría ayudarte."
         elif dominant_emotion == "alegría":
-            advice = "¡Estás feliz! Disfruta este momento positivo."
+            advice = "¡Estás feliz! Disfruta de este momento positivo y compártelo con quienes te rodean."
         elif dominant_emotion == "miedo":
-            advice = "Parece que tienes miedo. Respira profundamente y tómate un momento para calmarte."
+            advice = "El texto refleja miedo. Sería bueno que te tomes un respiro y te tranquilices."
         elif dominant_emotion == "sorpresa":
-            advice = "¡Qué sorpresa! Aprovecha esta emoción para explorar nuevas oportunidades."
+            advice = "¡Qué sorpresa! El texto indica que te sientes sorprendido. Aprovecha esta oportunidad para explorar nuevas ideas."
         elif dominant_emotion == "neutral":
-            advice = "Estás en un estado equilibrado. Mantén esta calma."
+            advice = "Tu estado emocional parece equilibrado. Mantén esta calma y sigue adelante con tu día."
         elif dominant_emotion == "asco":
-            advice = "Estás disgustado. Tómate un tiempo para reflexionar sobre lo que sientes."
+            advice = "El texto refleja asco. Es importante reflexionar sobre lo que te ha causado esta sensación."
 
         return emotions, dominant_emotion, advice
 
@@ -68,7 +68,7 @@ async def analyze_image(file: UploadFile = File(...)):
 
         # Si no se encuentra texto, devolver un error
         if not text.strip():
-            return {"error": "No se pudo extraer texto de la imagen"}
+            raise HTTPException(status_code=400, detail="No se pudo extraer texto de la imagen")
 
         # Analizar las emociones del texto extraído
         emotions, dominant_emotion, advice = analyze_text_emotion(text)
@@ -84,4 +84,4 @@ async def analyze_image(file: UploadFile = File(...)):
 
     except Exception as e:
         logging.error(f"Error al procesar la imagen: {e}")
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail="Error al procesar la imagen")
