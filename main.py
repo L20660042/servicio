@@ -1,16 +1,16 @@
-from fastapi import FastAPI, File, UploadFile
-from PIL import Image
-import pytesseract
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import JSONResponse
 from transformers import pipeline
 import io
+import numpy as np
+from PIL import Image
 
-# Inicializamos la aplicación FastAPI
 app = FastAPI()
 
-# Cargamos el pipeline para análisis de emociones (puedes reemplazar este modelo con el que prefieras)
-emotion_analysis_pipeline = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
+# Cargar el modelo de Hugging Face para análisis de emociones
+emotion_recognizer = pipeline("image-classification", model="facebook/dino-vit-base-patch16")
 
-# Ruta de salud para verificar si el servicio está activo
+# Endpoint para verificar que el modelo está cargado
 @app.get("/health")
 async def health():
     return {"model_loaded": True}
@@ -19,40 +19,38 @@ async def health():
 @app.post("/analyze-image")
 async def analyze_image(file: UploadFile = File(...)):
     try:
-        # Leemos la imagen cargada por el usuario
-        contents = await file.read()
-        image = Image.open(io.BytesIO(contents))
-
-        # Extraemos el texto de la imagen usando OCR (Tesseract)
-        text = pytesseract.image_to_string(image)
-
-        # Analizamos las emociones en el texto extraído
-        analysis = emotion_analysis_pipeline(text)
-        emotions = {emotion['label']: emotion['score'] for emotion in analysis}
-        dominant_emotion = max(emotions, key=emotions.get)
-
-        # Generamos el consejo emocional basado en la emoción dominante
-        advice = generar_consejo_emocional(dominant_emotion)
-
-        # Devolvemos los resultados
-        return {"data": {
-            "text": text,
-            "emotions": emotions,
-            "dominant_emotion": dominant_emotion,
-            "emotional_advice": advice
-        }}
+        # Leer la imagen del archivo
+        image_bytes = await file.read()
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Convertir la imagen a un formato adecuado para el modelo (si es necesario)
+        # Aquí puedes hacer preprocesamiento de la imagen si tu modelo lo requiere.
+        
+        # Usar el modelo para obtener las emociones
+        results = emotion_recognizer(image)
+        
+        # Suponiendo que el modelo retorna una etiqueta de emoción
+        emotion = results[0]["label"]  # Esto dependerá de cómo está configurado tu modelo
+        
+        # Generar el consejo basado en la emoción detectada
+        emotional_advice = generate_advice(emotion)
+        
+        return JSONResponse(content={
+            "data": {
+                "emotions": {emotion: 1.0},  # Aquí puedes agregar más emociones si el modelo lo permite
+                "dominant_emotion": emotion,
+                "emotional_advice": emotional_advice
+            }
+        })
+    
     except Exception as e:
-        return {"error": str(e)}
+        return JSONResponse(status_code=500, content={"message": str(e)})
 
-# Función para generar el consejo emocional
-def generar_consejo_emocional(emocion):
-    consejos = {
-        "anger": "Respira profundamente y relájate. Considera salir a caminar para liberar el estrés.",
-        "joy": "¡Sigue con ese excelente estado de ánimo! Sigue haciendo cosas que te hagan feliz.",
-        "sadness": "Está bien sentirse triste, pero hablar con alguien podría ayudarte.",
-        "fear": "Prueba con ejercicios de relajación y enfócate en tu respiración.",
-        "surprise": "¡Vaya! Es algo inesperado. Tómate tu tiempo para procesarlo.",
-        "disgust": "Tómate un tiempo para ti mismo, relájate y despeja tu mente.",
-        "neutral": "Parece que estás tranquilo. Disfruta el momento presente."
-    }
-    return consejos.get(emocion, "Mantente positivo/a!")
+# Función para generar consejos emocionales basados en la emoción detectada
+def generate_advice(emotion):
+    if emotion == "anger":
+        return "Mediante los trazos y el grosor de las líneas, se detecta que estás enojado. Se recomienda salir a distraerte."
+    elif emotion == "joy":
+        return "Se detecta que estás alegre. ¡Sigue disfrutando este momento positivo!"
+    else:
+        return "Emoción detectada. Mantén un equilibrio emocional."

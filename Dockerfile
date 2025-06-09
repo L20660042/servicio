@@ -1,18 +1,17 @@
-# Usa la imagen oficial de Python desde Docker Hub
+# Usar una imagen base de Python
 FROM python:3.9-slim
 
-# Configura el directorio de trabajo en el contenedor
+# Establecer el directorio de trabajo
 WORKDIR /app
 
-# Copia el archivo de requerimientos y instala las dependencias
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# Copia los archivos del proyecto al contenedor
+# Copiar los archivos del proyecto
 COPY . .
 
-# Expón el puerto en el que corre la app
+# Instalar las dependencias necesarias
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Exponer el puerto en el que se ejecutará el servicio
 EXPOSE 8000
 
-# Ejecuta la aplicación con Uvicorn
+# Comando para ejecutar el servidor
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
