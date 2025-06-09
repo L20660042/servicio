@@ -1,6 +1,6 @@
-fastapi==0.68.2
-uvicorn==0.15.0
-transformers==4.14.1
-torch==1.9.1  # O la versión de PyTorch adecuada
-pillow==8.4.0
-python-multipart==0.0.5  # Necesario para manejar archivos en el backend
+fastapi==0.95.0
+uvicorn==0.22.0
+Pillow==9.1.1
+torch==2.1.0
+transformers==4.29.1
+pytesseract==0.3.10
