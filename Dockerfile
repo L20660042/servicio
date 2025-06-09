@@ -1,19 +1,22 @@
-# Usar imagen base de Python
+# Dockerfile
 FROM python:3.9-slim
 
-# Establecer directorio de trabajo
+# Instalar dependencias necesarias para OpenCV
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0
+
+# Crear un directorio de trabajo en el contenedor
 WORKDIR /app
 
-# Copiar requisitos y el código
-COPY requirements.txt ./
-COPY main.py ./
+# Copiar todos los archivos del proyecto al contenedor
+COPY . /app/
 
-
-# Instalar dependencias
+# Instalar las dependencias del proyecto
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Exponer el puerto
+# Exponer el puerto donde FastAPI escuchará
 EXPOSE 8000
 
-# Comando para correr el servidor
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando para ejecutar el servicio con Uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
