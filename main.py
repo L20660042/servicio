@@ -1,50 +1,59 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import numpy as np
-import cv2
 import time
 import logging
+import numpy as np
+import pytesseract
+import cv2
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel
+from transformers import pipeline
 
-from ocr import extract_text
-from handwriting_features import calculate_stroke_thickness, calculate_slant_angle, calculate_spacing
-from text_emotion import TextEmotionAnalyzer
-from fusion import fuse_emotions, dominant_emotion
+# Inicializar FastAPI
+app = FastAPI()
 
-logging.basicConfig(level=logging.DEBUG)
+# Modelo de emociones de HuggingFace
+text_emotion_analyzer = pipeline("text-classification", model="j-hartmann/emotion-english-distilroberta-base")
 
-app = FastAPI(title="Servicio de Análisis de Emociones y Caligrafía")
+# Función OCR
+def extract_text(image_bytes):
+    # Usar pytesseract para convertir imagen a texto
+    img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_GRAYSCALE)
+    text = pytesseract.image_to_string(img)
+    return text
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Función de análisis de características de la caligrafía
+def calculate_stroke_thickness(img_bin):
+    # Placeholder para calcular grosor de trazo
+    return 1.0
 
-text_emotion_analyzer = TextEmotionAnalyzer()
+def calculate_slant_angle(img_bin):
+    # Placeholder para calcular ángulo de inclinación
+    return 0.0
 
-def generate_emotional_advice_ai(emotions: dict, dominant: str) -> str:
-    try:
-        from transformers import pipeline
-        text_generator = pipeline("text-generation", model="EleutherAI/gpt-neo-125M")
+def calculate_spacing(img_bin):
+    # Placeholder para calcular espaciado
+    return 1.0
 
-        prompt = (
-            f"Emociones detectadas: {emotions}\n"
-            f"Emoción dominante: {dominant}\n"
-            f"Genera un consejo emocional empático para ayudar a manejar estas emociones:"
-        )
+# Fusión de emociones
+def fuse_emotions(text_emotions, stroke_thickness, slant_angle, spacing):
+    combined_emotions = text_emotions.copy()
+    # Agregar análisis manuscrito a la emoción del texto (simplificado)
+    return combined_emotions
 
-        output = text_generator(prompt, max_length=60, do_sample=True, temperature=0.7)
-        return output[0]["generated_text"].split(":")[-1].strip()
-    except Exception as e:
-        logging.error(f"Error al generar consejo emocional: {e}")
-        return "No se pudo generar un consejo emocional en este momento."
+# Determinar la emoción dominante
+def dominant_emotion(emotions):
+    return max(emotions, key=emotions.get)
 
+# Generar recomendaciones emocionales
+def generate_emotional_advice_ai(emotions, dom_emotion):
+    advice = f"Recomendación basada en la emoción dominante: {dom_emotion}"
+    return advice
+
+# Ruta de salud
 @app.get("/health")
 async def health():
     return {"model_loaded": True}
 
+# Ruta para analizar la imagen
 @app.post("/analyze-image")
 async def analyze_image(file: UploadFile = File(...)):
     start_total = time.time()
@@ -74,14 +83,14 @@ async def analyze_image(file: UploadFile = File(...)):
 
         # Emociones desde texto
         start_text_emotion = time.time()
-        text_emotions = text_emotion_analyzer.analyze(text if text else " ")
+        text_emotions = text_emotion_analyzer(text if text else " ")
         logging.debug(f"Text emotion analysis time: {time.time() - start_text_emotion:.2f}s")
 
-        # Fusión
+        # Fusión de emociones
         combined_emotions = fuse_emotions(text_emotions, stroke_thickness, slant_angle, spacing)
         dom_emotion = dominant_emotion(combined_emotions)
 
-        # Consejo IA
+        # Consejos emocionales
         emotional_advice = generate_emotional_advice_ai(combined_emotions, dom_emotion)
 
         logging.debug(f"Total analyze time: {time.time() - start_total:.2f}s")
@@ -103,4 +112,5 @@ async def analyze_image(file: UploadFile = File(...)):
         }
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, timeout_keep_alive=120)
+    import uvicorn
+    uvicorn.run("app:app", host="0.0.0.0", port=8000)
