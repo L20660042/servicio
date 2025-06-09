@@ -1,7 +1,6 @@
-fastapi
-uvicorn
-pytesseract
-opencv-python
-numpy
-huggingface_hub
-transformers
+fastapi==0.68.2
+uvicorn==0.15.0
+transformers==4.14.1
+torch==1.9.1  # O la versión de PyTorch adecuada
+pillow==8.4.0
+python-multipart==0.0.5  # Necesario para manejar archivos en el backend
