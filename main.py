@@ -2,13 +2,13 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from transformers import pipeline
 from PIL import Image
+import pytesseract
 import io
 import logging
 
-# Crear la aplicación FastAPI
 app = FastAPI()
 
-# Configuración de CORS: Permitir todos los orígenes y todos los métodos
+# Configurar CORS para permitir solicitudes de cualquier dominio
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Permitir todos los orígenes
@@ -17,36 +17,37 @@ app.add_middleware(
     allow_headers=["*"],  # Permitir todos los encabezados
 )
 
-# Carga el modelo de Hugging Face para el análisis de emociones
+# Cargar el modelo de Hugging Face para el análisis de emociones
 emotion_model = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
-
-# Emociones disponibles para el análisis
 emotion_labels = ["enojo", "asco", "miedo", "alegría", "neutral", "tristeza", "sorpresa"]
 
-# Función para analizar imagen y devolver emociones
-def analyze_image_emotion(image_bytes):
+# Función para analizar las emociones en el texto extraído
+def analyze_text_emotion(text):
     try:
-        # Cargar la imagen
-        image = Image.open(io.BytesIO(image_bytes))
-        # Aquí puedes procesar la imagen con algún modelo de detección de emociones visuales
-        # Por ejemplo, utilizando una API o un modelo preentrenado para clasificación de emociones de la imagen
-
-        # Este es un ejemplo genérico de análisis de texto, puede ser modificado para imágenes
-        result = emotion_model("Analiza el rostro de la persona", candidate_labels=emotion_labels)
+        result = emotion_model(text, candidate_labels=emotion_labels)
         dominant_emotion = result['labels'][0]
         emotions = {emotion: result['scores'][i] for i, emotion in enumerate(result['labels'])}
-        
-        # Generar consejo emocional
-        advice = ""
+
+        # Generar un consejo basado en la emoción dominante
         if dominant_emotion == "enojo":
-            advice = "Mediante los trazos y el grosor de las líneas, se detecta que estás enojado. Se recomienda salir a distraerte."
+            advice = "Parece que estás enojado. Tal vez tomar un descanso y relajarte te ayude."
         elif dominant_emotion == "tristeza":
-            advice = "Parece que estás triste, tal vez tomar un descanso y hablar con alguien podría ayudarte."
+            advice = "Parece que estás triste. Hablar con alguien podría ayudarte a sentirte mejor."
+        elif dominant_emotion == "alegría":
+            advice = "¡Estás feliz! Disfruta este momento positivo."
+        elif dominant_emotion == "miedo":
+            advice = "Parece que tienes miedo. Respira profundamente y tómate un momento para calmarte."
+        elif dominant_emotion == "sorpresa":
+            advice = "¡Qué sorpresa! Aprovecha esta emoción para explorar nuevas oportunidades."
+        elif dominant_emotion == "neutral":
+            advice = "Estás en un estado equilibrado. Mantén esta calma."
+        elif dominant_emotion == "asco":
+            advice = "Estás disgustado. Tómate un tiempo para reflexionar sobre lo que sientes."
 
         return emotions, dominant_emotion, advice
 
     except Exception as e:
-        logging.error(f"Error al analizar la imagen: {e}")
+        logging.error(f"Error al analizar el texto: {e}")
         return {"error": str(e)}
 
 # Endpoint de salud del servicio
@@ -58,11 +59,23 @@ async def health():
 @app.post("/analyze-image")
 async def analyze_image(file: UploadFile = File(...)):
     try:
+        # Leer la imagen cargada
         image_bytes = await file.read()
-        emotions, dominant_emotion, advice = analyze_image_emotion(image_bytes)
+        image = Image.open(io.BytesIO(image_bytes))
+
+        # Usar Tesseract para extraer texto de la imagen
+        text = pytesseract.image_to_string(image)
+
+        # Si no se encuentra texto, devolver un error
+        if not text.strip():
+            return {"error": "No se pudo extraer texto de la imagen"}
+
+        # Analizar las emociones del texto extraído
+        emotions, dominant_emotion, advice = analyze_text_emotion(text)
 
         return {
             "data": {
+                "text": text,
                 "emotions": emotions,
                 "dominant_emotion": dominant_emotion,
                 "emotional_advice": advice,
